@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Filiação</title>
+    <link rel="icon" href="img/favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #001132;
+            color: white;
+            text-align: left;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid white;
+            border-radius: 10px;
+            background-color: #003399;
+            box-sizing: border-box;
+        }
+
+            input[type="text"], input[type="file"], input[type="date"], input[type="number"], textarea, select {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+        .assinatura-container {
+            width: 100%;
+            max-width: 580px;
+            margin: 10px auto;
+            padding: 10px;
+            border: 1px solid white;
+            border-radius: 10px;
+            background-color: #003399;
+            box-sizing: border-box;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header img {
+            width: 30%;
+            max-width: 150px;
+        }
+        .header h1 {
+            margin-top: 10px;
+        }
+        #signature {
+            border: 1px solid white;
+            height: 200px;
+            margin-bottom: 10px;
+            position: relative;
+            box-sizing: border-box;
+        }
+        #signature canvas {
+            border: 1px solid white;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .loader {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="img/logo.png" alt="Logo">
+            <h1><span style="color: yellow; font-size: 35px;">Termo de estorno</span></h1>
+        </div>
+        <form id="expenseForm">
+            <!-- Campos do formulário -->
+            <label for="nome">Nome Completo:</label>
+            <input type="text" id="nome" name="nome" required>
+            <label for="rg">RG:</label>
+            <input type="text" id="rg" name="rg" required>
+            <label for="cpf">CPF:</label>
+            <input type="text" id="cpf" name="cpf" required>
+            <label for="rf">RF:</label>
+            <input type="text" id="rf" name="rf" required>           
+            <label for="valor">Valor:</label>
+            <input type="number" id="valor" name="valor" step="0.01" required></form>
+            <label for="justificativa">Justificativa:</label>
+            <textarea id="justificativa" name="justificativa" required></textarea>
+            <label for="banco">Banco:</label>
+            <input type="text" id="banco" name="banco" required>
+            <label for="agencia">Agencia:</label>
+            <input type="text" id="agencia" name="agencia" required>
+            <label for="conta">Conta:</label>
+            <input type="text" id="conta" name="conta" required>
+            <label for="pix">Chave PIX:</label>
+            <input type="text" id="pix" name="pix">
+            <div class="assinatura-container">
+                <label for="signature">Assinatura:</label>
+                <div id="signature">
+                    <canvas></canvas>
+                </div>
+                <button type="button" onclick="clearSignature()">Limpar Assinatura</button>
+            </div>
+
+            <button type="submit" id="generatePDFButton">Gerar PDF</button>
+        </form>
+    </div>
+    <div class="loader"></div>
+    <div id="messageText"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+<script>
+
+    // Inicializar o SignaturePad
+    const canvas = document.querySelector('#signature canvas');
+    const signaturePad = new SignaturePad(canvas);
+
+    function resizeCanvas() {
+        const container = document.getElementById('signature');
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
+        signaturePad.clear();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('load', resizeCanvas);
+
+    function clearSignature() {
+        signaturePad.clear();
+    }
+
+    document.getElementById('generatePDFButton').addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        // Seleciona todos os campos obrigatórios
+        const requiredFields = document.querySelectorAll('input[required], select[required]');
+        let allValid = true;
+
+        requiredFields.forEach(field => {
+            if (!field.value || field.value === "nome" || field.value === "rg") {
+                field.style.borderColor = 'red'; // Destaca o campo não preenchido
+                field.style.borderWidth = '3px'; // Aumenta a espessura da borda
+                allValid = false;
+            } else {
+                field.style.borderColor = ''; // Reseta a cor do campo caso esteja preenchido
+            }
+        });
+
+        if (!allValid) {
+            alert('Por favor, preencha todos os campos obrigatórios antes de gerar o PDF.');
+            return; // Impede a geração do PDF
+        }
+
+        const loader = document.querySelector('.loader');
+        const messageText = document.getElementById('messageText');
+
+        loader.style.display = 'inline-block';
+        messageText.textContent = 'Gerando PDF...';
+
+        try {
+            const pdfBytes = await fetch('pdf/TERMO DE ESTORNO - Editavel.pdf').then(res => res.arrayBuffer());
+            const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+            const form = pdfDoc.getForm();
+
+            const fieldsMapping = {
+                'nome': 'nome',
+                'rf': 'rf',
+                'cpf': 'cpf',
+                'rg': 'rg',
+                'valor': 'valor',
+                'justificativa': 'justificativa',
+                'banco': 'banco',
+                'agencia': 'agencia',
+                'conta': 'conta',
+                'pix': 'pix'
+
+            };
+
+                    // Função para obter o nome do mês por extenso em português
+        function mesPorExtenso(mes) {
+            const meses = [
+                'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+            ];
+            return meses[mes - 1]; // Ajusta o índice, já que meses começam do 1
+        }
+
+        // Adiciona a data atual aos campos específicos
+        const today = new Date();
+        const day = today.getDate();
+        const month = today.getMonth() + 1; // O mês começa do 0 em JavaScript, então adicionamos 1
+        const year = today.getFullYear();
+
+        // Atualize os campos de data no PDF
+        const dayField = form.getTextField('dia');
+        if (dayField) dayField.setText(day.toString());
+
+        const monthField = form.getTextField('mes');
+        if (monthField) monthField.setText(mesPorExtenso(month)); // Usa a função mesPorExtenso para obter o nome do mês
+
+        const yearField = form.getTextField('ano');
+        if (yearField) yearField.setText(year.toString());
+
+            // Função para garantir que o número tenha dois dígitos
+            function formatarDoisDigitos(numero) {
+                return numero.toString().padStart(2, '0');
+            }
+
+            // Função para formatar a data no formato dd/mm/aaaa
+            function formatarDataParaABNT(data) {
+                const dia = formatarDoisDigitos(data.getDate());
+                const mes = formatarDoisDigitos(data.getMonth() + 1); // Meses começam do 0
+                const ano = data.getFullYear();
+                return `${dia}/${mes}/${ano}`;
+            }
+
+            for (const [pdfField, htmlField] of Object.entries(fieldsMapping)) {
+                let value = document.getElementById(htmlField)?.value || '';
+
+                if (pdfField === 'data-nasc' || pdfField === 'inicio-gcm') {
+                    // Se o campo é uma data, formate-o
+                    const date = new Date(value);
+                    if (!isNaN(date.getTime())) { // Verifica se a data é válida
+                        value = formatarDataParaABNT(date);
+                    }
+                }
+
+                if (form.getTextField(pdfField)) {
+                    form.getTextField(pdfField).setText(value);
+                }
+            }
+
+            if (signaturePad.isEmpty()) {
+                alert('A assinatura é obrigatória.');
+                return;
+            }
+
+            const signatureImage = signaturePad.toDataURL('image/png');
+            const image = await pdfDoc.embedPng(signatureImage);
+
+            const signatureWidth = 150; // Defina a largura desejada
+            const signatureHeight = 50; // Defina a altura desejada
+            const firstPage = pdfDoc.getPage(0); // Obter a primeira página do documento
+
+            firstPage.drawImage(image, {
+                x: 120,
+                y: 280,
+                width: signatureWidth,
+                height: signatureHeight
+            });
+
+            const pdfBytesUpdated = await pdfDoc.save();
+            const blob = new Blob([pdfBytesUpdated], { type: 'application/pdf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+
+            // Captura o nome do usuário e cria o nome do arquivo
+            const nome = document.getElementById('nome')?.value || 'Termo de estorno';
+            const safeNome = nome.replace(/[<>:"/\\|?*]/g, ''); // Remove caracteres inválidos para Nome de arquivo
+            const fileName = `Termo de estorno - ${safeNome}.pdf`;
+            link.download = fileName; // Usa o Nome capturado para o arquivo
+
+            link.click();
+
+            loader.style.display = 'none';
+            messageText.textContent = 'PDF gerado com sucesso!';
+
+            // Limpar o formulário
+            document.getElementById('expenseForm').reset();
+
+            // Limpar a assinatura
+            signaturePad.clear();
+
+            document.getElementById('messageText').textContent = 'PDF gerado com sucesso!';
+        } catch (error) {
+            console.error('Erro ao gerar o PDF:', error);
+            document.getElementById('messageText').textContent = 'Erro ao gerar o PDF.';
+        } finally {
+            document.querySelector('.loader').style.display = 'none';
+        }
+    });
+
+</script>
+</body>
+</html>
